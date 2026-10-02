@@ -1,0 +1,15 @@
+// Add "custom/kube" to modules-left, modules-center or modules-right in
+// ~/.config/waybar/config.jsonc, then paste this block next to the other modules.
+"custom/kube": {
+  "exec": "kubebar status",
+  "return-type": "json",
+  "interval": 5,
+  // Must match waybar_signal in ~/.config/kubebar/config.toml.
+  "signal": 8,
+  // Tooltips are Pango markup; escaping keeps odd context names from breaking it.
+  "escape": true,
+  "max-length": 40,
+  "format": "k8s {}",
+  "on-click": "kubebar switch",
+  "on-click-right": "kubebar ns"
+}

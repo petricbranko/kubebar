@@ -1,0 +1,4 @@
+/bin/
+/kubebar
+*.test
+*.out

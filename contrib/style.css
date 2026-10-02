@@ -1,0 +1,22 @@
+/* Append to ~/.config/waybar/style.css. Omarchy themes only define
+   @foreground and @background for Waybar, so prod inverts them instead of
+   relying on a red that may not exist. */
+#custom-kube {
+  margin: 0 7.5px;
+}
+
+#custom-kube.ok {
+  color: @foreground;
+}
+
+#custom-kube.prod {
+  color: @background;
+  background-color: @foreground;
+  padding: 0 6px;
+  font-weight: bold;
+}
+
+#custom-kube.none {
+  color: @foreground;
+  opacity: 0.4;
+}
