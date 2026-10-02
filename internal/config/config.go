@@ -20,19 +20,24 @@ const maxSignal = 30
 type Config struct {
 	ProdPatterns []*regexp.Regexp
 	MenuCommand  string
+	// InputCommand prompts for free text. Empty means the menu itself
+	// returns typed text that matches no item, as Walker and rofi do.
+	InputCommand string
 	WaybarSignal int
 }
 
 type file struct {
 	ProdPatterns []string `toml:"prod_patterns"`
 	MenuCommand  string   `toml:"menu_command"`
+	InputCommand string   `toml:"input_command"`
 	WaybarSignal int      `toml:"waybar_signal"`
 }
 
 func defaults() file {
 	return file{
 		ProdPatterns: []string{"prod"},
-		MenuCommand:  "walker --dmenu -p",
+		MenuCommand:  "omarchy-menu-select",
+		InputCommand: "omarchy-menu-input",
 		WaybarSignal: 8,
 	}
 }
@@ -84,7 +89,12 @@ func (f file) parse() (Config, error) {
 		}
 		patterns = append(patterns, re)
 	}
-	return Config{ProdPatterns: patterns, MenuCommand: f.MenuCommand, WaybarSignal: f.WaybarSignal}, nil
+	return Config{
+		ProdPatterns: patterns,
+		MenuCommand:  f.MenuCommand,
+		InputCommand: strings.TrimSpace(f.InputCommand),
+		WaybarSignal: f.WaybarSignal,
+	}, nil
 }
 
 func (c Config) IsProd(context string) bool {

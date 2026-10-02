@@ -12,21 +12,27 @@ import (
 	"github.com/petricbranko/kubebar/internal/waybar"
 )
 
+// otherNamespace can never collide with a real namespace, which must be a
+// lowercase RFC 1123 label.
+const otherNamespace = "Other namespace..."
+
 // menuFunc shows items and returns the chosen line, or "" when the menu was
 // dismissed.
 type menuFunc func(prompt string, items []string) (string, error)
 
 type app struct {
-	cfg     config.Config
-	access  clientcmd.ConfigAccess
-	menu    menuFunc
+	cfg    config.Config
+	access clientcmd.ConfigAccess
+	menu   menuFunc
+	// input is nil when the menu accepts typed text on its own.
+	input   menuFunc
 	refresh func() error
 	notify  func(summary, body string) error
 	stderr  io.Writer
 }
 
 func newApp(cfg config.Config, access clientcmd.ConfigAccess, stderr io.Writer) *app {
-	return &app{
+	a := &app{
 		cfg:     cfg,
 		access:  access,
 		menu:    shellMenu(cfg.MenuCommand, stderr),
@@ -34,6 +40,10 @@ func newApp(cfg config.Config, access clientcmd.ConfigAccess, stderr io.Writer) 
 		notify:  notifyCritical,
 		stderr:  stderr,
 	}
+	if cfg.InputCommand != "" {
+		a.input = shellMenu(cfg.InputCommand, stderr)
+	}
+	return a
 }
 
 func status(cfg config.Config, access clientcmd.ConfigAccess) waybar.Status {
@@ -80,7 +90,15 @@ func (a *app) switchNamespace() error {
 	if err != nil {
 		return err
 	}
-	choice, err := a.menu("Namespace for "+cur.Context, kube.Namespaces(kc))
+	prompt := "Namespace for " + cur.Context
+	items := kube.Namespaces(kc)
+	if a.input != nil {
+		items = append(items, otherNamespace)
+	}
+	choice, err := a.menu(prompt, items)
+	if err == nil && choice == otherNamespace {
+		choice, err = a.input(prompt, nil)
+	}
 	if err != nil || choice == "" {
 		return err
 	}

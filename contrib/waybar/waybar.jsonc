@@ -1,5 +1,6 @@
 // Add "custom/kube" to modules-left, modules-center or modules-right in
 // ~/.config/waybar/config.jsonc, then paste this block next to the other modules.
+// Use config.toml from this directory so kubebar opens Walker.
 "custom/kube": {
   "exec": "kubebar status",
   "return-type": "json",

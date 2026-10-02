@@ -1,80 +1,83 @@
 # kubebar
 
-Show the current Kubernetes context and namespace in Waybar, and switch them from a dmenu-style launcher (Walker on Omarchy).
+Show the current Kubernetes context and namespace in the Omarchy bar, and switch them from the Omarchy menu.
+
+Built for Omarchy 4. Waybar setups, such as Omarchy 3, are covered [below](#waybar-and-omarchy-3).
 
 ## Install
 
 ```sh
-go install github.com/petricbranko/kubebar/cmd/kubebar@latest
+sudo pacman -S --needed go
+GOBIN=~/.local/bin go install github.com/petricbranko/kubebar/cmd/kubebar@latest
+kubebar status
 ```
 
-Waybar and Hyprland need to find `kubebar` on their `PATH`. If `~/go/bin` is not on it, use the full path in the snippets below.
+`~/.local/bin` is on the `PATH` that the Omarchy shell and Hyprland use, so the bar and keybindings can find `kubebar`.
+
+## Bar
+
+Add kubebar to the right side of the bar:
+
+```sh
+f=~/.config/omarchy/shell.json
+[ -f "$f" ] || cp "$OMARCHY_PATH/config/omarchy/shell.json" "$f"
+jq '.bar.layout.right |= [{"id":"kubebar","type":"command","exec":"kubebar status","interval":2,"onClick":"kubebar switch","onRightClick":"kubebar ns"}] + map(select(.id != "kubebar"))' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+```
+
+The shell reloads `shell.json` on change. Running the command again replaces the entry instead of adding a second one. The entry is also in [contrib/omarchy/bar-module.json](contrib/omarchy/bar-module.json) if you prefer to paste it into `bar.layout` yourself, and you can drag it to another spot on the bar.
+
+Left click switches the context. Right click switches the namespace. Production contexts are drawn in the active highlight color.
+
+## Keybindings
+
+Append to `~/.config/hypr/bindings.lua`:
+
+```lua
+o.bind("SUPER + SHIFT + K", "Kube context", "kubebar switch")
+o.bind("SUPER + SHIFT + ALT + K", "Kube namespace", "kubebar ns")
+```
 
 ## Usage
 
 ```
-kubebar status   # one line of Waybar JSON
+kubebar status   # one line of JSON for the bar
 kubebar switch   # pick a context
-kubebar ns       # pick or type a namespace for the current context
+kubebar ns       # pick a namespace, or choose "Other namespace..." to type one
 ```
 
-## Waybar
-
-Add `"custom/kube"` to a `modules-*` list in `~/.config/waybar/config.jsonc` and add the module:
-
-```jsonc
-"custom/kube": {
-  "exec": "kubebar status",
-  "return-type": "json",
-  "interval": 5,
-  "signal": 8,
-  "escape": true,
-  "max-length": 40,
-  "format": "k8s {}",
-  "on-click": "kubebar switch",
-  "on-click-right": "kubebar ns"
-}
-```
-
-Append to `~/.config/waybar/style.css`:
-
-```css
-#custom-kube.ok   { color: @foreground; }
-#custom-kube.prod { color: @background; background-color: @foreground; padding: 0 6px; font-weight: bold; }
-#custom-kube.none { color: @foreground; opacity: 0.4; }
-```
-
-The status has class `prod`, `ok` or `none` (no kubeconfig, no current context, or an error, shown in the tooltip).
-
-## Keybinding
-
-Append to `~/.config/hypr/bindings.conf`:
-
-```
-bindd = SUPER SHIFT, K, Kube context, exec, kubebar switch
-bindd = SUPER SHIFT ALT, K, Kube namespace, exec, kubebar ns
-```
-
-Ready-to-copy files are in [contrib/](contrib/).
+Switching to a context that matches a prod pattern sends a critical notification.
 
 ## Config
 
 Optional, at `$XDG_CONFIG_HOME/kubebar/config.toml` (default `~/.config/kubebar/config.toml`). All keys are optional:
 
 ```toml
-# Regexes matched against the context name. Matching contexts get the
-# "prod" class and a critical notification on switch.
+# Regexes matched against the context name. Matching contexts are
+# highlighted and trigger a critical notification on switch.
 prod_patterns = ["prod"]
 
 # Run with sh -c. Items arrive on stdin, the prompt is appended as the last
 # argument, and the first line of output is the selection.
-menu_command = "walker --dmenu -p"
+menu_command = "omarchy-menu-select"
 
-# Waybar is refreshed with pkill -RTMIN+<signal> waybar. Must match "signal".
+# Prompts for a namespace that is not in the list. Set to "" when the menu
+# returns typed text itself, as Walker and rofi do.
+input_command = "omarchy-menu-input"
+
+# Only used with Waybar: refreshed with pkill -RTMIN+<signal> waybar.
 waybar_signal = 8
 ```
 
-A non-zero exit from the menu counts as cancelled. To ignore the appended prompt, end the command with `#`, for example `menu_command = "head -n1 #"`.
+A non-zero exit from the menu counts as cancelled.
+
+## Waybar and Omarchy 3
+
+`kubebar status` prints Waybar custom module JSON. Use the files in [contrib/waybar/](contrib/waybar/):
+
+- `config.toml` to `~/.config/kubebar/config.toml`, so kubebar opens Walker
+- `waybar.jsonc` into `~/.config/waybar/config.jsonc`
+- `style.css` appended to `~/.config/waybar/style.css`
+- `bindings.conf` appended to `~/.config/hypr/bindings.conf`
 
 ## How it works
 

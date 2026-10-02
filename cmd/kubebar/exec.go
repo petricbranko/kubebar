@@ -11,9 +11,12 @@ import (
 func shellMenu(command string, stderr io.Writer) menuFunc {
 	return func(prompt string, items []string) (string, error) {
 		// sh -c allows shell quoting in menu_command. The prompt is appended
-		// as the last argument so "walker --dmenu -p" receives it as -p's value.
+		// as the last argument, where omarchy-menu-select expects it and where
+		// "walker --dmenu -p" reads it as the value of -p.
 		cmd := exec.Command("sh", "-c", command+` "$@"`, "sh", prompt)
-		cmd.Stdin = strings.NewReader(strings.Join(items, "\n") + "\n")
+		if len(items) > 0 {
+			cmd.Stdin = strings.NewReader(strings.Join(items, "\n") + "\n")
+		}
 		cmd.Stderr = stderr
 		out, err := cmd.Output()
 		var exitErr *exec.ExitError

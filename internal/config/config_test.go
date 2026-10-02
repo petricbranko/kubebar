@@ -8,7 +8,7 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	defaults := loaded{[]string{"prod"}, "walker --dmenu -p", 8}
+	defaults := loaded{[]string{"prod"}, "omarchy-menu-select", "omarchy-menu-input", 8}
 	tests := []struct {
 		name    string
 		content *string
@@ -20,13 +20,14 @@ func TestLoad(t *testing.T) {
 		{
 			name: "all keys",
 			content: ptr(`prod_patterns = ["^prd-", "live$"]
-menu_command = "fuzzel --dmenu -p"
+menu_command = "walker --dmenu -p"
+input_command = ""
 waybar_signal = 12
 `),
-			want: loaded{[]string{"^prd-", "live$"}, "fuzzel --dmenu -p", 12},
+			want: loaded{[]string{"^prd-", "live$"}, "walker --dmenu -p", "", 12},
 		},
-		{name: "partial keeps defaults", content: ptr(`waybar_signal = 3`), want: loaded{[]string{"prod"}, "walker --dmenu -p", 3}},
-		{name: "no prod patterns", content: ptr(`prod_patterns = []`), want: loaded{[]string{}, "walker --dmenu -p", 8}},
+		{name: "partial keeps defaults", content: ptr(`waybar_signal = 3`), want: loaded{[]string{"prod"}, "omarchy-menu-select", "omarchy-menu-input", 3}},
+		{name: "no prod patterns", content: ptr(`prod_patterns = []`), want: loaded{[]string{}, "omarchy-menu-select", "omarchy-menu-input", 8}},
 		{name: "invalid regex", content: ptr(`prod_patterns = ["("]`), wantErr: true},
 		{name: "unknown key", content: ptr(`menu = "rofi"`), wantErr: true},
 		{name: "signal out of range", content: ptr(`waybar_signal = 0`), wantErr: true},
@@ -51,8 +52,8 @@ waybar_signal = 12
 			if err != nil {
 				t.Fatalf("Load: %v", err)
 			}
-			got := loaded{patternStrings(cfg), cfg.MenuCommand, cfg.WaybarSignal}
-			if !slices.Equal(got.patterns, tt.want.patterns) || got.menu != tt.want.menu || got.signal != tt.want.signal {
+			got := loaded{patternStrings(cfg), cfg.MenuCommand, cfg.InputCommand, cfg.WaybarSignal}
+			if !slices.Equal(got.patterns, tt.want.patterns) || got.menu != tt.want.menu || got.input != tt.want.input || got.signal != tt.want.signal {
 				t.Errorf("got %+v, want %+v", got, tt.want)
 			}
 		})
@@ -62,6 +63,7 @@ waybar_signal = 12
 type loaded struct {
 	patterns []string
 	menu     string
+	input    string
 	signal   int
 }
 

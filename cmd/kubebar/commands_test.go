@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -59,27 +60,27 @@ func TestStatus(t *testing.T) {
 		{
 			name:    "ok",
 			current: "dev",
-			want:    waybar.Status{Text: "dev/web", Tooltip: "Context: dev\nCluster: dev-cluster\nNamespace: web", Class: "ok"},
+			want:    waybar.Status{Text: "dev/web", Tooltip: "Context: dev\nCluster: dev-cluster\nNamespace: web", Class: []string{"ok"}},
 		},
 		{
 			name:    "prod",
 			current: "prod-eu",
-			want:    waybar.Status{Text: "prod-eu/default", Tooltip: "Context: prod-eu\nCluster: prod-cluster\nNamespace: default", Class: "prod"},
+			want:    waybar.Status{Text: "prod-eu/default", Tooltip: "Context: prod-eu\nCluster: prod-cluster\nNamespace: default", Class: []string{"prod", "active"}},
 		},
 		{
 			name:    "no current context",
 			current: `""`,
-			want:    waybar.Status{Text: "no context", Tooltip: "no current context", Class: "none"},
+			want:    waybar.Status{Text: "no context", Tooltip: "no current context", Class: []string{"none"}},
 		},
 		{
 			name:    "dangling current context",
 			current: "gone",
-			want:    waybar.Status{Text: "no context", Tooltip: `no current context: context "gone" not found`, Class: "none"},
+			want:    waybar.Status{Text: "no context", Tooltip: `no current context: context "gone" not found`, Class: []string{"none"}},
 		},
 		{
 			name:   "no kubeconfig",
 			noFile: true,
-			want:   waybar.Status{Text: "no context", Tooltip: "no current context", Class: "none"},
+			want:   waybar.Status{Text: "no context", Tooltip: "no current context", Class: []string{"none"}},
 		},
 	}
 	for _, tt := range tests {
@@ -89,7 +90,7 @@ func TestStatus(t *testing.T) {
 			} else {
 				setupKubeconfig(t, tt.current)
 			}
-			if got := status(testConfig, clientcmd.NewDefaultPathOptions()); got != tt.want {
+			if got := status(testConfig, clientcmd.NewDefaultPathOptions()); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("got  %+v\nwant %+v", got, tt.want)
 			}
 		})
@@ -103,14 +104,14 @@ func TestRunStatusAlwaysSucceeds(t *testing.T) {
 	if code := run([]string{"status"}, &out, io.Discard); code != 0 {
 		t.Errorf("exit code = %d, want 0", code)
 	}
-	if want := `{"text":"no context","tooltip":"no current context","class":"none"}` + "\n"; out.String() != want {
+	if want := `{"text":"no context","tooltip":"no current context","class":["none"]}` + "\n"; out.String() != want {
 		t.Errorf("output = %s, want %s", out.String(), want)
 	}
 }
 
 type recorder struct {
-	prompts   []string
 	items     [][]string
+	inputs    int
 	refreshes int
 	notices   []string
 }
@@ -120,9 +121,12 @@ func newTestApp(rec *recorder, choice string, menuErr error) *app {
 		cfg:    testConfig,
 		access: clientcmd.NewDefaultPathOptions(),
 		menu: func(prompt string, items []string) (string, error) {
-			rec.prompts = append(rec.prompts, prompt)
 			rec.items = append(rec.items, items)
 			return choice, menuErr
+		},
+		input: func(prompt string, items []string) (string, error) {
+			rec.inputs++
+			return "typed-ns", nil
 		},
 		refresh: func() error { rec.refreshes++; return nil },
 		notify: func(summary, body string) error {
@@ -172,21 +176,30 @@ func TestSwitchContext(t *testing.T) {
 
 func TestSwitchNamespace(t *testing.T) {
 	tests := []struct {
-		name    string
-		choice  string
-		wantNS  string
-		wantErr bool
+		name       string
+		choice     string
+		noInput    bool
+		wantNS     string
+		wantInputs int
+		wantErr    bool
 	}{
 		{name: "listed", choice: "default", wantNS: "default"},
-		{name: "typed", choice: "payments", wantNS: "payments"},
+		{name: "other prompts for input", choice: otherNamespace, wantNS: "typed-ns", wantInputs: 1},
+		{name: "typed into menu", choice: "payments", noInput: true, wantNS: "payments"},
 		{name: "cancelled", choice: "", wantNS: "web"},
-		{name: "invalid", choice: "Not Valid", wantNS: "web", wantErr: true},
+		{name: "invalid", choice: "Not Valid", noInput: true, wantNS: "web", wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			path := setupKubeconfig(t, "dev")
 			rec := &recorder{}
-			err := newTestApp(rec, tt.choice, nil).switchNamespace()
+			a := newTestApp(rec, tt.choice, nil)
+			wantItems := []string{"default", "web", otherNamespace}
+			if tt.noInput {
+				a.input = nil
+				wantItems = wantItems[:2]
+			}
+			err := a.switchNamespace()
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -197,8 +210,11 @@ func TestSwitchNamespace(t *testing.T) {
 			if got := cfg.Contexts["dev"].Namespace; got != tt.wantNS {
 				t.Errorf("namespace = %q, want %q", got, tt.wantNS)
 			}
-			if !slices.Equal(rec.items[0], []string{"default", "web"}) {
-				t.Errorf("menu items = %v", rec.items[0])
+			if !slices.Equal(rec.items[0], wantItems) {
+				t.Errorf("menu items = %v, want %v", rec.items[0], wantItems)
+			}
+			if rec.inputs != tt.wantInputs {
+				t.Errorf("input prompts = %d, want %d", rec.inputs, tt.wantInputs)
 			}
 		})
 	}
@@ -214,6 +230,7 @@ func TestShellMenu(t *testing.T) {
 		{name: "picks first", command: "head -n1 #", want: "dev"},
 		{name: "receives prompt", command: `printf '%s\n'`, want: "Pick one"},
 		{name: "dismissed", command: "exit 1 #", want: ""},
+		{name: "omarchy style prompt first", command: `pick() { test "$1" = "Pick one" && head -n1; }; pick`, want: "dev"},
 		{name: "missing command", command: "kubebar-no-such-menu", wantErr: true},
 	}
 	for _, tt := range tests {

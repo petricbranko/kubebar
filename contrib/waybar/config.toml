@@ -1,0 +1,6 @@
+# ~/.config/kubebar/config.toml for Waybar setups with Walker,
+# such as Omarchy 3.
+menu_command = "walker --dmenu -p"
+# Walker returns typed text that matches no item, so no separate prompt.
+input_command = ""
+waybar_signal = 8

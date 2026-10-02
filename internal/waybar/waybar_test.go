@@ -14,17 +14,17 @@ func TestWrite(t *testing.T) {
 		{
 			name:   "ok",
 			status: Context("dev", "dev-cluster", "web", false),
-			want:   `{"text":"dev/web","tooltip":"Context: dev\nCluster: dev-cluster\nNamespace: web","class":"ok"}` + "\n",
+			want:   `{"text":"dev/web","tooltip":"Context: dev\nCluster: dev-cluster\nNamespace: web","class":["ok"]}` + "\n",
 		},
 		{
 			name:   "prod",
 			status: Context("prod", "prod-cluster", "default", true),
-			want:   `{"text":"prod/default","tooltip":"Context: prod\nCluster: prod-cluster\nNamespace: default","class":"prod"}` + "\n",
+			want:   `{"text":"prod/default","tooltip":"Context: prod\nCluster: prod-cluster\nNamespace: default","class":["prod","active"]}` + "\n",
 		},
 		{
 			name:   "none",
 			status: None("no context", "no current context"),
-			want:   `{"text":"no context","tooltip":"no current context","class":"none"}` + "\n",
+			want:   `{"text":"no context","tooltip":"no current context","class":["none"]}` + "\n",
 		},
 	}
 	for _, tt := range tests {

@@ -1,5 +1,5 @@
-// Package waybar formats output for a Waybar custom module with
-// "return-type": "json".
+// Package waybar formats status in the Waybar custom module JSON format,
+// which the Omarchy shell's command modules also read.
 package waybar
 
 import (
@@ -12,18 +12,21 @@ const (
 	ClassOK   = "ok"
 	ClassProd = "prod"
 	ClassNone = "none"
+	// ClassActive is the only class the Omarchy shell's command modules
+	// style, so prod carries it to stand out there.
+	ClassActive = "active"
 )
 
 type Status struct {
-	Text    string `json:"text"`
-	Tooltip string `json:"tooltip"`
-	Class   string `json:"class"`
+	Text    string   `json:"text"`
+	Tooltip string   `json:"tooltip"`
+	Class   []string `json:"class"`
 }
 
 func Context(context, cluster, namespace string, prod bool) Status {
-	class := ClassOK
+	class := []string{ClassOK}
 	if prod {
-		class = ClassProd
+		class = []string{ClassProd, ClassActive}
 	}
 	return Status{
 		Text:    context + "/" + namespace,
@@ -33,7 +36,7 @@ func Context(context, cluster, namespace string, prod bool) Status {
 }
 
 func None(text, tooltip string) Status {
-	return Status{Text: text, Tooltip: tooltip, Class: ClassNone}
+	return Status{Text: text, Tooltip: tooltip, Class: []string{ClassNone}}
 }
 
 // Write prints s as a single line, which is what Waybar reads per update.

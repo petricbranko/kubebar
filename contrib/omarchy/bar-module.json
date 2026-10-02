@@ -1,0 +1,8 @@
+{
+  "id": "kubebar",
+  "type": "command",
+  "exec": "kubebar status",
+  "interval": 2,
+  "onClick": "kubebar switch",
+  "onRightClick": "kubebar ns"
+}
